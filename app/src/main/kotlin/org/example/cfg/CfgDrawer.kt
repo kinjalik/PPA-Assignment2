@@ -6,7 +6,11 @@ import io.github.rchowell.dotlin.digraph
 import java.util.Queue
 
 
-fun draw(headNode: CfgNode) = digraph {
+fun draw(headNode: CfgNode,
+         showReferenced: Boolean = false,
+         showAssigned: Boolean = false,
+         showLive: Boolean = false) =
+digraph {
     node {
         shape = DotNodeShape.BOX
     }
@@ -20,7 +24,7 @@ fun draw(headNode: CfgNode) = digraph {
         if (nodeA in applied)
             continue
         + nodeA.lineNum.toString() + {
-            label = nodeA.toDotString()
+            label = nodeA.toDotString(showReferenced, showAssigned, showLive)
         }
         applied.add(nodeA)
         for (nodeB in nodeA.nextNodes) {

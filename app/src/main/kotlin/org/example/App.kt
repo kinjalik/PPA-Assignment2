@@ -11,27 +11,19 @@ import org.example.cfg.CfgBuildVisitor
 import org.example.cfg.CfgBuildVisitor2
 import org.example.cfg.CfgNode
 import org.example.cfg.draw
+import org.example.lva.liveVariableAnalysis
 
 fun main() {
-    val text = "print \"Test Nested If\";" +
-            "if cmd <= 10 then {" +
-            "    if cmd <= 20 then {" +
-            "        c := 30" +
-            "    } else {" +
-            "        skip" +
-            "    }" +
-            "} else {" +
-            "    skip" +
-            "};" +
-            "print a + b;" +
-            "while b + a <= 10000 do {" +
-            "    print b;" +
-            "    b := a + b" +
-            "};" +
-            "print \"FINISH\";"+
-            "print \"FINISH\";"+
-            "print \"FINISH\";"+
-            "print \"FINISH\""
+    val text = "print \"Fibonacci Sequence\";\n" +
+            "c := 1000;\n" +
+            "print c;\n" +
+            "a := 0;\n" +
+            "b := 1;\n" +
+            "while b <= 1000000 do {\n" +
+            "  print b;\n" +
+            "  b := a + b;\n" +
+            "  a := b - a\n" +
+            "}"
 
     val charStream = CharStreams.fromString(text);
     val lexer = WhilelangLexer(charStream);
@@ -39,8 +31,9 @@ fun main() {
     val parser = WhilelangParser(tokens)
     val ret = CfgBuildVisitor2().visit(parser.program())
 
-//    ret.forEach(CfgNode::printVerbose)
+    liveVariableAnalysis(ret[0])
 
-    val g = draw(ret[0])
-    print(g.dot())
+    ret.forEach(CfgNode::printVerbose)
+
+    print(draw(ret[0], showLive = true).dot())
 }
