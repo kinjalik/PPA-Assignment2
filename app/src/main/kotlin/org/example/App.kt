@@ -32,7 +32,6 @@ fun main() {
     val ret = CfgBuildVisitor2().visit(parser.program())
 
     liveVariableAnalysis(ret[0])
-
     ret.forEach(CfgNode::printVerbose)
 
     print(draw(ret[0], showLive = true).dot())

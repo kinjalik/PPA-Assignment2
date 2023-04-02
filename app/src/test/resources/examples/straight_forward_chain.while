@@ -1,0 +1,9 @@
+print "Start of chain";
+a := 0;
+print "chain node";
+print "chain node";
+print "chain node";
+print "chain node";
+print "chain node";
+a := a + 30;
+b := 40

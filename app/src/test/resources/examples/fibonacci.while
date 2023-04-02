@@ -1,0 +1,10 @@
+c := 100;
+print "Fibonacci Sequence";
+print c;
+a := 0;
+b := 1;
+while b <= 1000000 do {
+  print b;
+  b := a + b;
+  a := b - a
+}

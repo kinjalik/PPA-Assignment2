@@ -4,13 +4,13 @@ import org.example.cfg.CfgNode
 
 private const val ITERATION_LIMIT = 1000
 
-fun liveVariableAnalysis(head: CfgNode) {
+fun liveVariableAnalysis(head: CfgNode) = sequence {
     val exitPoints = findExitPoints(head)
 
     var updated = true
     var i = 0
     while (updated) {
-        print("Iteration ${i + 1}\n")
+//        print("Iteration ${i + 1}\n")
         updated = false
         i++
         if (i >= ITERATION_LIMIT) throw TooManyIterations()
@@ -29,5 +29,6 @@ fun liveVariableAnalysis(head: CfgNode) {
 
             queue.addAll(pred(current))
         }
+        yield(Unit)
     }
 }

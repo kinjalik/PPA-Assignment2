@@ -1,0 +1,12 @@
+a := read;
+b := a + 30;
+if a <= 30 then {
+    if b <= 40 then {
+        a := 30
+    } else {
+        skip
+    }
+} else {
+    skip
+};
+print a
