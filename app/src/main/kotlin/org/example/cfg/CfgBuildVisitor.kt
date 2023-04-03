@@ -3,21 +3,14 @@ package org.example.cfg
 import WhilelangBaseVisitor
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.misc.Interval
+import org.antlr.v4.runtime.tree.TerminalNode
 
-class CfgBuildVisitor : WhilelangBaseVisitor<List<CfgNode>>() {
-
+class CfgBuildVisitor : WhilelangBaseVisitor<List<CfgNode>>(){
     private val lines = mutableMapOf<Int, CfgNode>()
     private fun getLineNode(lineNum: Int, lineText: String = ""): CfgNode {
         if (lineNum !in lines) {
             val cur = CfgNode(lineText, lineNum)
             lines[lineNum] = cur
-
-            // Link to previous
-            if (lineNum != 0 && lineNum - 1 in lines) {
-                val prev = lines[lineNum - 1]!!
-                cur.previousNodes += prev
-                prev.nextNodes += cur
-            }
         }
         val ret = lines[lineNum]!!
         if (ret.lineText == "") {
@@ -27,74 +20,101 @@ class CfgBuildVisitor : WhilelangBaseVisitor<List<CfgNode>>() {
     }
 
     override fun defaultResult(): List<CfgNode> = lines.values.toList()
-
-    private var insideExpression = false
-    override fun visitAttrib(ctx: WhilelangParser.AttribContext?): List<CfgNode> {
-        val lineText = sourceTextForContext(ctx!!)
-        val lineNum = ctx.start.line
-        val idName = ctx.ID().toString()
-
-        val node = getLineNode(lineNum, lineText)
-        node.assigned += idName
-
-        insideExpression = true
-        val ret = super.visitAttrib(ctx)
-        insideExpression = false
-        return ret
+    override fun visitProgram(ctx: WhilelangParser.ProgramContext?): List<CfgNode> {
+        val mainSeq = ctx!!.seqStatement()
+        visitSeqStatement(mainSeq, listOf())
+        return defaultResult()
     }
 
+    var currentNode: CfgNode? = null
     override fun visitId(ctx: WhilelangParser.IdContext?): List<CfgNode> {
-        val lineText = sourceTextForContext(ctx!!)
-        val lineNum = ctx.start.line
-        val idName = ctx.ID().toString()
-
-        val node = getLineNode(lineNum, lineText)
-        if (insideExpression) {
-            node.referenced += idName
-        }
-
+        if (currentNode != null)
+            currentNode!!.referenced.add(ctx!!.ID().toString())
         return super.visitId(ctx)
     }
 
-    var currentBlockCtx: CfgNode? = null
-    override fun visitIf(ctx: WhilelangParser.IfContext?): List<CfgNode> {
+    override fun visitAttrib(ctx: WhilelangParser.AttribContext?): List<CfgNode> {
+        if (currentNode != null)
+            currentNode!!.assigned.add(ctx!!.ID().toString())
+        return super.visitAttrib(ctx)
+    }
+
+    var lastLine = 1
+    fun visitSeqStatement(ctx: WhilelangParser.SeqStatementContext?, prevNodes: List<Int>): List<Int> {
+        var prevNodeNums: List<Int> = prevNodes
+        ctx!!.children.forEach {
+            if (it is TerminalNode)
+                return@forEach
+
+            if (it is WhilelangParser.IfContext) {
+                prevNodeNums = visitIf(it, prevNodeNums)
+                return@forEach
+            }
+
+            if (it is WhilelangParser.WhileContext) {
+                prevNodeNums = visitWhile(it, prevNodeNums)
+                return@forEach
+            }
+
+            val text = it.text
+            val lineNum = lastLine++
+            val node = getLineNode(lineNum, text)
+            prevNodeNums!!.forEach {
+                val curPrevNode = getLineNode(it)
+                node.previousNodes += curPrevNode!!
+                curPrevNode!!.nextNodes += node
+            }
+            prevNodeNums = listOf(node.lineNum)
+
+            currentNode = node
+            visit(it)
+
+        }
+        return prevNodeNums
+    }
+
+    private fun visitWhile(ctx: WhilelangParser.WhileContext?, prevLines: List<Int>): List<Int> {
+        val lineText = "while (" + sourceTextForContext(ctx!!.bool()) + ")"
+        val codeLineNum = lastLine++
+        val node = getLineNode(codeLineNum, lineText)
+        prevLines.forEach {
+            val prev = getLineNode(it)
+            node.previousNodes += prev
+            prev.nextNodes += node
+        }
+        val iterEnd = visitSeqStatement(ctx.statement().children[1] as WhilelangParser.SeqStatementContext?,
+                      listOf(codeLineNum))
+        iterEnd.forEach {
+            val endNode = getLineNode(it)
+            endNode.nextNodes += node
+        }
+
+        currentNode = node
+        visit(ctx.bool())
+
+        return listOf(node.lineNum)
+    }
+
+    private fun visitIf(ctx: WhilelangParser.IfContext?, prevLines: List<Int>): List<Int> {
         val lineText = "if (" + sourceTextForContext(ctx!!.bool()) + ")"
-        val lineNum = ctx.start.line
-        val node = getLineNode(lineNum, lineText)
+        val codeLineNum = lastLine++
+        val node = getLineNode(codeLineNum, lineText)
+        prevLines.forEach {
+            val prev = getLineNode(it)
+            node.previousNodes += prev
+            prev.nextNodes += node
+        }
+        currentNode = node
+        visit(ctx.bool())
 
-        val oldIfCtx = currentBlockCtx
-        currentBlockCtx = node
-        insideExpression = true
-        super.visit(ctx!!.bool())
-        insideExpression = false
-        currentBlockCtx = oldIfCtx
+        val prevFromTrue = visitSeqStatement(ctx.statement(0).children[1] as WhilelangParser.SeqStatementContext?,
+                                             listOf(codeLineNum))
+        val prevFromFalse = visitSeqStatement(ctx.statement(1).children[1] as WhilelangParser.SeqStatementContext?,
+                                              listOf(codeLineNum))
 
-        super.visit(ctx.statement(0))
-        super.visit(ctx.statement(1))
-        return defaultResult()
+        return prevFromTrue + prevFromFalse
     }
 
-    override fun visitWrite(ctx: WhilelangParser.WriteContext?): List<CfgNode> {
-        val lineText = sourceTextForContext(ctx!!)
-        val lineNum = ctx.start.line
-        val node = getLineNode(lineNum, lineText)
-
-        insideExpression = true
-        super.visit(ctx.expression())
-        insideExpression = false
-        return defaultResult()
-    }
-
-    override fun visitSkip(ctx: WhilelangParser.SkipContext?) = genericLineText(ctx!!)
-
-    private fun genericLineText(ctx: ParserRuleContext): List<CfgNode> {
-        val lineText = sourceTextForContext(ctx)
-        val lineNum = ctx.start.line
-        val node = getLineNode(lineNum, lineText)
-        return defaultResult()
-    }
-
-    // Inspired by https://stackoverflow.com/questions/50443728/context-gettext-excludes-spaces-in-antlr4
     private fun sourceTextForContext(context: ParserRuleContext): String {
         val startToken = context.start
         val line = startToken.line

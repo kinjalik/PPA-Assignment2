@@ -1,7 +1,6 @@
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
-import org.example.cfg.CfgBuildVisitor2
-import org.example.cfg.CfgNode
+import org.example.cfg.CfgBuildVisitor
 import org.example.cfg.draw
 import org.example.lva.liveVariableAnalysis
 import org.junit.jupiter.params.ParameterizedTest
@@ -19,7 +18,7 @@ class LvaDemo {
         val lexer = WhilelangLexer(charStream);
         val tokens = CommonTokenStream(lexer)
         val parser = WhilelangParser(tokens)
-        val ret = CfgBuildVisitor2().visit(parser.program())
+        val ret = CfgBuildVisitor().visit(parser.program())
 
 //        liveVariableAnalysis(ret[0]).toList()
 //        ret.forEach(CfgNode::printVerbose)
